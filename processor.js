@@ -10,6 +10,8 @@ var Processor = /** @class */ (function () {
         this.worker = null;
         this.handlers = new Map();
         this.handlerId = 0;
+        this.ready = false;
+        this.pendingWork = [];
         // generate the JavaScript code to be executed by the worker
         var funcString = func.toString();
         var workerCodeFuncString = this.workerCode.toString();
@@ -26,6 +28,14 @@ var Processor = /** @class */ (function () {
                 _this.worker.postMessage({
                     libs: libs
                 });
+                return;
+            }
+            else if (e.data == "ready") {
+                _this.ready = true;
+                for (var _i = 0, _a = _this.pendingWork; _i < _a.length; _i++) {
+                    var work = _a[_i];
+                    _this.worker.postMessage(work);
+                }
                 return;
             }
             // get the handler function
@@ -65,6 +75,9 @@ var Processor = /** @class */ (function () {
                         if (request.readyState == 4) {
                             eval(request.responseText);
                             libsNeedLoading--;
+                            if (libsNeedLoading == 0) {
+                                postMessage("ready");
+                            }
                         }
                     };
                     request.open("GET", lib);
@@ -75,23 +88,19 @@ var Processor = /** @class */ (function () {
                     var lib = _a[_i];
                     _loop_1(lib);
                 }
+                if (libsNeedLoading == 0) {
+                    postMessage("ready");
+                }
             }
             else {
-                var process_1 = function () {
-                    if (libsNeedLoading > 0) {
-                        setTimeout(process_1, 100);
-                        return;
-                    }
-                    // call the work function
-                    var output = func(e.data.input);
-                    // send the response
-                    var workerOutput = {
-                        id: e.data.id,
-                        output: output
-                    };
-                    postMessage(workerOutput);
+                // call the work function
+                var output = func(e.data.input);
+                // send the response
+                var workerOutput = {
+                    id: e.data.id,
+                    output: output
                 };
-                process_1();
+                postMessage(workerOutput);
             }
         });
         postMessage("init");
@@ -125,7 +134,12 @@ var Processor = /** @class */ (function () {
             input: input,
             libs: null
         };
-        this.worker.postMessage(workerInput);
+        if (this.ready) {
+            this.worker.postMessage(workerInput);
+        }
+        else {
+            this.pendingWork.push(workerInput);
+        }
         return subscription;
     };
     /**

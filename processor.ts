@@ -7,6 +7,8 @@ export class Processor<IN, OUT> {
 	private worker: Worker | null = null;
 	private handlers: Map<number, ((output: OUT) => void)> = new Map();
 	private handlerId = 0;
+	private ready = false;
+	private pendingWork: WorkerInput<IN>[] = [];
 	
 	constructor(func: (input: IN) => OUT, libs: string[] = []) {
 		// generate the JavaScript code to be executed by the worker
@@ -18,7 +20,7 @@ export class Processor<IN, OUT> {
 		this.worker = result.worker;
 		
 		// hook into the worker's events
-		this.worker.addEventListener("message", (e: { data: WorkerOutput<OUT> | "init" }) => {
+		this.worker.addEventListener("message", (e: { data: WorkerOutput<OUT> | "init" | "ready" }) => {
 			if (this.worker == null) return;
 			
 			if (e.data == "init") {
@@ -29,6 +31,12 @@ export class Processor<IN, OUT> {
 					libs: libs
 				});
 				
+				return;
+			} else if (e.data == "ready") {
+				this.ready = true;
+				for (let work of this.pendingWork) {
+					this.worker.postMessage(work);
+				}
 				return;
 			}
 			
@@ -74,30 +82,27 @@ export class Processor<IN, OUT> {
 						if (request.readyState == 4) {
 							eval(request.responseText);
 							libsNeedLoading--;
+							if (libsNeedLoading == 0) {
+								postMessage("ready");
+							}
 						}
 					};
 					request.open("GET", lib);
 					request.send();
 				}
+				if (libsNeedLoading == 0) {
+					postMessage("ready");
+				}
 			} else {
-				let process = function () {
-					if (libsNeedLoading > 0) {
-						setTimeout(process, 100);
-						return;
-					}
-					
-					// call the work function
-					let output = func(e.data.input);
-					
-					// send the response
-					let workerOutput: WorkerOutput<OUT> = {
-						id: e.data.id,
-						output: output
-					};
-					postMessage(workerOutput);
-				};
+				// call the work function
+				let output = func(e.data.input);
 				
-				process();
+				// send the response
+				let workerOutput: WorkerOutput<OUT> = {
+					id: e.data.id,
+					output: output
+				};
+				postMessage(workerOutput);
 			}
 		});
 		
@@ -137,7 +142,12 @@ export class Processor<IN, OUT> {
 			input: input,
 			libs: null
 		};
-		this.worker.postMessage(workerInput);
+		
+		if (this.ready) {
+			this.worker.postMessage(workerInput);
+		} else {
+			this.pendingWork.push(workerInput);
+		}
 		
 		return subscription;
 	}
@@ -160,10 +170,10 @@ export class Processor<IN, OUT> {
 	 * @param libs
 	 */
 	public static process<IN, OUT>(
-		func: (input: IN) => OUT,
-		input: IN,
-		response: (output: OUT) => void,
-		libs: string[] = []
+			func: (input: IN) => OUT,
+			input: IN,
+			response: (output: OUT) => void,
+			libs: string[] = []
 	): void {
 		let processor = new Processor(func, libs);
 		processor.process(input, out => {
