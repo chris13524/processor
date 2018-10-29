@@ -9,7 +9,7 @@ Why use this library over a regular web worker? Web workers don't accept functio
 Copy processor.ts into your project (you could maybe do something with processor.js too, but I haven't tried it).
 
 First, create the processor like so:
-```
+```typescript
 let processor = new Processor<InputType, OutputType>((input: InputType) => {
 	let output: OutputType = /* process input */;
 	return output;
@@ -17,7 +17,7 @@ let processor = new Processor<InputType, OutputType>((input: InputType) => {
 ```
 
 Then you can send jobs to it like so:
-```
+```typescript
 let input: InputType = /* something to process */;
 processor.process(input, (output: OutputType) => {
 	/* do something with output */
@@ -27,7 +27,7 @@ processor.process(input, (output: OutputType) => {
 And finally, be sure to clean up the processor when you're done using `processor.terminate()`. Not doing this could cause memory leaks. If you're storing the processor reference somewhere safe where it will never be lost (such as a global variable), then you don't need to worry about terminating it.
 
 For those only wanting to process stuff once, use the convenience method `Processor.process()`. The `terminate()` method will automatically be called upon completion.
-```
+```typescript
 let input: InputType = /* something to process */;
 Processor.process((input: InputType) => {
 	let output: OutputType = /* process input */;
@@ -38,7 +38,7 @@ Processor.process((input: InputType) => {
 ```
 
 You can also provide an array of URLs for JS libraries. These libraries will be loaded before any of your work starts processing:
-```
+```typescript
 let processor = new Processor<InputType, OutputType>((input: InputType) => {
 	let output: OutputType = /* process input */;
 	return output;
