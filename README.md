@@ -37,6 +37,14 @@ Processor.process((input: InputType) => {
 });
 ```
 
+You can also provide an array of URLs for JS libraries. These libraries will be loaded before any of your work starts processing:
+```
+let processor = new Processor<InputType, OutputType>((input: InputType) => {
+	let output: OutputType = /* process input */;
+	return output;
+}, ["https://example.com/path/to/date.js"]);
+```
+
 ## Restrictions
 You cannot capture any scope in the function you pass to the processor. Web workers run in their own little environment in the browser, so if you're trying to use `this`, you'll get runtime errors. Any data you want to process must be explicitally passed through the `input` parameter.
 
